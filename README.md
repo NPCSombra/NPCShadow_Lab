@@ -1,4 +1,4 @@
-# NPCShadow_Lab   
+# Home Lab
 
 A self-hosted virtual lab built from scratch in VirtualBox: an OPNsense firewall segmenting
 three isolated networks, an Active Directory domain, a Kali attacker VM, and a Cowrie SSH
@@ -78,7 +78,48 @@ but a working environment that gets broken, diagnosed, and fixed like a real one
 - Isolated a "DNS works, nothing else does" failure down to the firewall's **WAN interface
   landing on the wrong internal subnet**, re-pointing it correctly.
 
+## Example Exercise: Metasploit vs. Cowrie
+
+A quick case study showing the honeypot and the attacker VM actually interacting, with the
+full picture visible from both sides.
+
+**From Kali**, used Metasploit's SSH credential scanner against the honeypot:
+
+```
+msf6 > use auxiliary/scanner/ssh/ssh_login
+msf6 auxiliary(scanner/ssh/ssh_login) > set RHOSTS 10.10.20.50
+msf6 auxiliary(scanner/ssh/ssh_login) > set RPORT 2222
+msf6 auxiliary(scanner/ssh/ssh_login) > set USERNAME root
+msf6 auxiliary(scanner/ssh/ssh_login) > set PASSWORD toor
+msf6 auxiliary(scanner/ssh/ssh_login) > run
+
+[*] 10.10.20.50:2222      - Starting bruteforce
+[+] 10.10.20.50:2222      - Success: 'root:toor' ''
+[-] 10.10.20.50:2222      - Failed to setup the session - Net::SSH::Exception Unknown platform: unknown
+[*] Scanned 1 of 1 hosts (100% complete)
+```
+
+The credential scan succeeded, but Metasploit couldn't turn it into a usable interactive
+session — a small, interesting tell that it had hit a honeypot rather than a real host.
+
+**On the Cowrie side**, the log shows exactly why:
+
+```
+Command found: help
+Command not found: ?
+exitCode: 127
+remote close
+Closing TTY Log
+Timeout reached in HoneyPotSSHTransport
+connection lost
+```
+
+After authenticating, Metasploit probes the shell to fingerprint the OS (`help`, then `?`).
+Cowrie only emulates a specific set of real Linux commands, so the unrecognized probe
+returned "command not found" — which is exactly why Metasploit's platform detection failed
+and reported "Unknown platform." Full session visibility on both ends: the attacker's tool
+output and the honeypot's TTY-level record of every command it tried.
+
 ## Status
 
-Actively maintained — next planned additions: Metasploitable target on Attacknet, a basic
-SIEM/log pipeline, and documented attack scenarios run from Kali against the domain network.
+Actively maintained —  a basic SIEM/log pipeline, and documented attack scenarios run from Kali against the domain network.
